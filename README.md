@@ -1,6 +1,6 @@
 # ⚡ gambetta-netcode-rs
 
-[![GitHub Pages](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-brightgreen?style=for-the-badge&logo=github)](https://bhubbard.github.io/gambetta-netcode-rs/)
+[![GitHub Pages](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-brightgreen?style=for-the-badge&logo=github)](https://code.brandonhubbard.com/gambetta-netcode-rs/)
 [![Rust Edition 2024](https://img.shields.io/badge/Rust-2024%20Edition-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue?style=for-the-badge)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-Passing-success?style=for-the-badge&logo=githubactions)](tests/)
@@ -10,7 +10,7 @@
 
 ---
 
-## 🎮 [Launch Live Interactive Sandbox](https://bhubbard.github.io/gambetta-netcode-rs/)
+## 🎮 [Launch Live Interactive Sandbox](https://code.brandonhubbard.com/gambetta-netcode-rs/)
 
 Experience the netcode live in your browser:
 - **Tri-View Visualization**: Real-time side-by-side rendering of Client 1 (predicted), Authoritative Server, and Client 2 (remote bot).
