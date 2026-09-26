@@ -906,6 +906,53 @@
       </div>
     </div>
 
+    <!-- Performance Benchmarks vs JavaScript Reference -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="text-xs font-mono uppercase tracking-wider text-cyan-400 font-bold mb-1">Performance Benchmarks</div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>⚡</span> Nanosecond Netcode vs. JavaScript Reference (V8)
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Comparing pure Rust zero-allocation ring buffers against Gabriel Gambetta's original JavaScript implementation.
+            <a href="https://github.com/bhubbard/gambetta-netcode-rs/blob/main/BENCHMARKS.md" class="text-cyan-400 font-mono font-semibold underline ml-2">Read Full BENCHMARKS.md →</a>
+          </p>
+        </div>
+        <div>
+          <span class="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-bold">
+            ● 1,300× Faster than JS
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+        <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-semibold">Prediction Reconciliation</div>
+          <div class="text-xl font-mono font-bold text-cyan-400 mt-1">49.5 ns <span class="text-xs text-slate-400 font-normal">/ rec</span></div>
+          <div class="text-[10px] text-emerald-400 mt-1">1,312× faster vs JS (65 µs)</div>
+        </div>
+
+        <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-semibold">100-Entity Interpolation</div>
+          <div class="text-xl font-mono font-bold text-amber-400 mt-1">743.0 ns <span class="text-xs text-slate-400 font-normal">/ frame</span></div>
+          <div class="text-[10px] text-emerald-400 mt-1">134.5 Million entities/sec</div>
+        </div>
+
+        <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-semibold">1,000-Entity MMO Scale</div>
+          <div class="text-xl font-mono font-bold text-indigo-400 mt-1">7.32 µs <span class="text-xs text-slate-400 font-normal">/ frame</span></div>
+          <div class="text-[10px] text-emerald-400 mt-1">JS drops below 30 FPS (>18ms)</div>
+        </div>
+
+        <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-semibold">Server Lag Rewind Raycast</div>
+          <div class="text-xl font-mono font-bold text-rose-400 mt-1">184.0 ns <span class="text-xs text-slate-400 font-normal">/ ray</span></div>
+          <div class="text-[10px] text-emerald-400 mt-1">5.43 Million raycasts/sec</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Explanatory Architecture Guide -->
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
       <h2 class="text-lg font-bold text-white flex items-center gap-2">
