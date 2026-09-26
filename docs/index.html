@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gambetta Netcode Simulator | Pure Rust Multiplayer Architecture</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .canvas-border { border: 2px solid rgba(255, 255, 255, 0.1); }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">⚡</span>
+        <div>
+          <h1 class="font-bold text-lg text-white leading-tight">gambetta-netcode-rs</h1>
+          <p class="text-xs text-slate-400">Pure Rust Client-Side Prediction, Reconciliation, Interpolation & Lag Compensation</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="https://github.com/bhubbard/gambetta-netcode-rs" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition flex items-center gap-1.5">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub Repo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <!-- Controls Bar -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+        <!-- Latency slider -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-400 font-medium">One-Way Latency</span>
+            <span id="latency-val" class="font-mono text-cyan-400 font-bold">100 ms</span>
+          </div>
+          <input id="latency-slider" type="range" min="0" max="400" step="10" value="100" class="w-full accent-cyan-500 cursor-pointer">
+          <div class="text-[10px] text-slate-500 mt-0.5">Simulates round-trip time: <span id="rtt-val" class="font-mono">200 ms</span></div>
+        </div>
+
+        <!-- Packet loss slider -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-400 font-medium">Packet Drop Rate</span>
+            <span id="drop-val" class="font-mono text-rose-400 font-bold">0%</span>
+          </div>
+          <input id="drop-slider" type="range" min="0" max="30" step="5" value="0" class="w-full accent-rose-500 cursor-pointer">
+          <div class="text-[10px] text-slate-500 mt-0.5">Drop rate on upstream & downstream</div>
+        </div>
+
+        <!-- Prediction & Interpolation Toggles -->
+        <div class="flex flex-col gap-2">
+          <label class="flex items-center gap-2 cursor-pointer text-xs select-none">
+            <input id="toggle-prediction" type="checkbox" checked class="w-4 h-4 rounded text-cyan-600 bg-slate-800 border-slate-700">
+            <span>Client 1 Prediction</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer text-xs select-none">
+            <input id="toggle-interpolation" type="checkbox" checked class="w-4 h-4 rounded text-amber-600 bg-slate-800 border-slate-700">
+            <span>Entity Interpolation (100ms)</span>
+          </label>
+        </div>
+
+        <!-- Action triggers -->
+        <div class="flex flex-wrap gap-2">
+          <button id="btn-shoot" class="px-3 py-2 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-semibold rounded-lg text-xs transition shadow-lg shadow-rose-950/40">
+            🎯 Fire Weapon (Lag Comp)
+          </button>
+          <button id="btn-nudge" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold rounded-lg text-xs transition">
+            ⚡ Force Reconciliation
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live 3-Panel View: Client 1 | Server | Client 2 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Client 1 Panel -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span class="font-bold text-sm text-cyan-400">Client 1 (You)</span>
+          </div>
+          <span id="c1-seq" class="text-[11px] font-mono text-slate-400">Seq: #0</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mb-2">
+          WASD or Arrow Keys to move. Shoots with Space / button.
+        </p>
+        <div class="relative bg-slate-950 rounded-lg overflow-hidden canvas-border aspect-[4/3]">
+          <canvas id="canvas-c1" class="w-full h-full block"></canvas>
+          <div class="absolute bottom-2 left-2 text-[10px] font-mono bg-slate-900/80 px-2 py-1 rounded border border-slate-800 text-slate-300">
+            <span class="text-cyan-400 font-bold">● Local</span>
+            <span class="text-slate-500 ml-2">◌ Server Ghost</span>
+            <span class="text-rose-400 ml-2">■ Remote Target</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Server Panel -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <span class="font-bold text-sm text-emerald-400">Authoritative Server</span>
+          </div>
+          <span id="srv-tick" class="text-[11px] font-mono text-slate-400">Tick: #0 (60Hz)</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mb-2">
+          Validates inputs, simulates world, rewinds history on raycast.
+        </p>
+        <div class="relative bg-slate-950 rounded-lg overflow-hidden canvas-border aspect-[4/3]">
+          <canvas id="canvas-srv" class="w-full h-full block"></canvas>
+          <div id="hit-banner" class="absolute top-2 left-2 right-2 text-center text-[11px] font-bold py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 opacity-0 transition-opacity">
+            🎯 Lag Comp Hit: Target Rewound 200ms
+          </div>
+          <div class="absolute bottom-2 left-2 text-[10px] font-mono bg-slate-900/80 px-2 py-1 rounded border border-slate-800 text-slate-300">
+            <span class="text-cyan-400">● C1 Server</span>
+            <span class="text-rose-400 ml-2">■ C2 Server</span>
+            <span class="text-amber-400 ml-2">◬ Rewound Hitbox</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client 2 Panel -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+            <span class="font-bold text-sm text-rose-400">Client 2 (Remote Bot)</span>
+          </div>
+          <span class="text-[11px] font-mono text-slate-400">Autonomous Patrol</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mb-2">
+          Moves autonomously back and forth across the arena.
+        </p>
+        <div class="relative bg-slate-950 rounded-lg overflow-hidden canvas-border aspect-[4/3]">
+          <canvas id="canvas-c2" class="w-full h-full block"></canvas>
+          <div class="absolute bottom-2 left-2 text-[10px] font-mono bg-slate-900/80 px-2 py-1 rounded border border-slate-800 text-slate-300">
+            <span class="text-rose-400">■ Local C2</span>
+            <span class="text-cyan-400 ml-2">● Interpolated C1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnostic Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Unacknowledged Inputs</div>
+        <div id="stat-buffer" class="text-xl font-mono font-bold text-cyan-400 mt-1">0</div>
+        <div class="text-[10px] text-slate-500">Awaiting server ACK</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Reconciliations</div>
+        <div id="stat-recon" class="text-xl font-mono font-bold text-indigo-400 mt-1">0</div>
+        <div class="text-[10px] text-slate-500">Rollbacks & replays</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Rewind Hit Delta</div>
+        <div id="stat-rewind" class="text-xl font-mono font-bold text-amber-400 mt-1">0.0 ms</div>
+        <div class="text-[10px] text-slate-500">History lookback</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Hits Registered</div>
+        <div id="stat-hits" class="text-xl font-mono font-bold text-emerald-400 mt-1">0</div>
+        <div class="text-[10px] text-slate-500">Lag compensated</div>
+      </div>
+    </div>
+
+    <!-- Explanatory Architecture Guide -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span>📖</span> Gabriel Gambetta's Netcode Architecture in Pure Rust
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-slate-300">
+        <div class="space-y-2">
+          <h3 class="font-semibold text-cyan-400">1. Client-Side Prediction</h3>
+          <p class="text-xs leading-relaxed text-slate-400">
+            Local player inputs are applied immediately to the local predicted state without waiting for the server round-trip. Every input is recorded in a circular buffer with a sequence number.
+          </p>
+          <h3 class="font-semibold text-indigo-400 pt-2">2. Server Reconciliation</h3>
+          <p class="text-xs leading-relaxed text-slate-400">
+            The authoritative server simulates inputs in order and sends snapshots with the last processed sequence $S_{srv}$. The client discards inputs $\le S_{srv}$, snaps to server state, and reapplies all inputs $> S_{srv}$.
+          </p>
+        </div>
+        <div class="space-y-2">
+          <h3 class="font-semibold text-amber-400">3. Remote Entity Interpolation</h3>
+          <p class="text-xs leading-relaxed text-slate-400">
+            Remote entities cannot be predicted. Instead, snapshots are buffered and rendered 100ms in the past with linear or Hermite cubic spline interpolation, guaranteeing buttery smooth motion even over packet jitter.
+          </p>
+          <h3 class="font-semibold text-rose-400 pt-2">4. Lag Compensation / Hitbox Rewind</h3>
+          <p class="text-xs leading-relaxed text-slate-400">
+            When a client fires at $T_{shot} = T_{now} - \text{RTT}/2 - \text{render\_delay}$, the server temporarily rewinds all remote player colliders to that exact historical frame, runs raycasts, and restores current state.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Simulation state
+    const arenaWidth = 400;
+    const arenaHeight = 300;
+
+    let latencyMs = 100;
+    let dropRate = 0;
+    let predictionEnabled = true;
+    let interpolationEnabled = true;
+
+    // Stats
+    let reconCount = 0;
+    let hitsCount = 0;
+
+    // Keys
+    const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+
+    window.addEventListener('keydown', (e) => {
+      if (keys.hasOwnProperty(e.code)) {
+        keys[e.code] = true;
+        e.preventDefault();
+      }
+      if (e.code === 'Space') {
+        fireShot();
+        e.preventDefault();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (keys.hasOwnProperty(e.code)) {
+        keys[e.code] = false;
+        e.preventDefault();
+      }
+    });
+
+    // Wire sliders
+    const latencySlider = document.getElementById('latency-slider');
+    const latencyVal = document.getElementById('latency-val');
+    const rttVal = document.getElementById('rtt-val');
+    const dropSlider = document.getElementById('drop-slider');
+    const dropVal = document.getElementById('drop-val');
+    const togglePrediction = document.getElementById('toggle-prediction');
+    const toggleInterpolation = document.getElementById('toggle-interpolation');
+    const btnShoot = document.getElementById('btn-shoot');
+    const btnNudge = document.getElementById('btn-nudge');
+
+    latencySlider.addEventListener('input', (e) => {
+      latencyMs = parseInt(e.target.value);
+      latencyVal.textContent = latencyMs + ' ms';
+      rttVal.textContent = (latencyMs * 2) + ' ms';
+    });
+
+    dropSlider.addEventListener('input', (e) => {
+      dropRate = parseInt(e.target.value) / 100;
+      dropVal.textContent = e.target.value + '%';
+    });
+
+    togglePrediction.addEventListener('change', (e) => {
+      predictionEnabled = e.target.checked;
+    });
+
+    toggleInterpolation.addEventListener('change', (e) => {
+      interpolationEnabled = e.target.checked;
+    });
+
+    btnShoot.addEventListener('click', fireShot);
+    btnNudge.addEventListener('click', () => {
+      // Force server teleport nudge
+      serverState.c1.x += (Math.random() - 0.5) * 80;
+      serverState.c1.y += (Math.random() - 0.5) * 80;
+    });
+
+    // Simulated Server World
+    let serverTick = 0;
+    const serverState = {
+      c1: { x: 80, y: 150, vx: 0, vy: 0 },
+      c2: { x: 320, y: 80, vy: 120 }
+    };
+    let serverLastProcessedC1Seq = 0;
+    const serverHistory = []; // { timestamp, c1, c2 }
+    const serverInputQueueC1 = [];
+
+    // Client 1 World
+    let c1Seq = 0;
+    let c1Predicted = { x: 80, y: 150 };
+    let c1ServerGhost = { x: 80, y: 150 };
+    const c1InputBuffer = []; // { seq, dt, dx, dy }
+    const c1RemoteSnapshots = []; // timestamped c2 snapshots
+
+    // Network Packets in Flight
+    const clientToServer = []; // { deliverAt, input }
+    const serverToClient1 = []; // { deliverAt, snapshot }
+
+    // Active visual effects
+    let activeRay = null; // { origin, dir, length, hit, rewoundTarget, expiresAt }
+
+    function fireShot() {
+      const now = performance.now();
+      const rtt = latencyMs * 2;
+      const renderDelay = 100;
+      const shotTime = now - (rtt / 2) - renderDelay;
+
+      // Send fire request to server
+      clientToServer.push({
+        deliverAt: now + latencyMs,
+        type: 'shoot',
+        shotTime: shotTime,
+        origin: { x: c1Predicted.x, y: c1Predicted.y },
+        targetX: 320 // aiming at C2's patrol column
+      });
+    }
+
+    // Set canvas sizes
+    const c1Canvas = document.getElementById('canvas-c1');
+    const srvCanvas = document.getElementById('canvas-srv');
+    const c2Canvas = document.getElementById('canvas-c2');
+    [c1Canvas, srvCanvas, c2Canvas].forEach(c => {
+      c.width = arenaWidth;
+      c.height = arenaHeight;
+    });
+
+    const ctx1 = c1Canvas.getContext('2d');
+    const ctxSrv = srvCanvas.getContext('2d');
+    const ctx2 = c2Canvas.getContext('2d');
+
+    let lastTime = performance.now();
+
+    function loop(currentTime) {
+      const dt = Math.min((currentTime - lastTime) / 1000, 0.05);
+      lastTime = currentTime;
+
+      // 1. Client 1 input sampling
+      let moveX = 0;
+      let moveY = 0;
+      if (keys.KeyA || keys.ArrowLeft) moveX -= 1;
+      if (keys.KeyD || keys.ArrowRight) moveX += 1;
+      if (keys.KeyW || keys.ArrowUp) moveY -= 1;
+      if (keys.KeyS || keys.ArrowDown) moveY += 1;
+
+      const len = Math.hypot(moveX, moveY);
+      if (len > 0) {
+        moveX /= len;
+        moveY /= len;
+      }
+
+      const speed = 180;
+      c1Seq++;
+      const input = { seq: c1Seq, dt, dx: moveX * speed * dt, dy: moveY * speed * dt };
+      c1InputBuffer.push(input);
+
+      if (predictionEnabled) {
+        c1Predicted.x = Math.max(16, Math.min(arenaWidth - 16, c1Predicted.x + input.dx));
+        c1Predicted.y = Math.max(16, Math.min(arenaHeight - 16, c1Predicted.y + input.dy));
+      }
+
+      // Send to server across simulated network
+      if (Math.random() >= dropRate) {
+        clientToServer.push({
+          deliverAt: currentTime + latencyMs,
+          type: 'input',
+          input: input
+        });
+      }
+
+      // 2. Deliver packets to server
+      for (let i = clientToServer.length - 1; i >= 0; i--) {
+        const pkt = clientToServer[i];
+        if (currentTime >= pkt.deliverAt) {
+          clientToServer.splice(i, 1);
+          if (pkt.type === 'input') {
+            serverInputQueueC1.push(pkt.input);
+          } else if (pkt.type === 'shoot') {
+            handleServerShot(pkt);
+          }
+        }
+      }
+
+      // 3. Server Tick (simulate 60Hz steps)
+      serverTick++;
+      while (serverInputQueueC1.length > 0) {
+        const inp = serverInputQueueC1.shift();
+        serverState.c1.x = Math.max(16, Math.min(arenaWidth - 16, serverState.c1.x + inp.dx));
+        serverState.c1.y = Math.max(16, Math.min(arenaHeight - 16, serverState.c1.y + inp.dy));
+        serverLastProcessedC1Seq = inp.seq;
+      }
+
+      // Simulate C2 patrol on server
+      serverState.c2.y += serverState.c2.vy * dt;
+      if (serverState.c2.y > arenaHeight - 40) {
+        serverState.c2.y = arenaHeight - 40;
+        serverState.c2.vy = -Math.abs(serverState.c2.vy);
+      } else if (serverState.c2.y < 40) {
+        serverState.c2.y = 40;
+        serverState.c2.vy = Math.abs(serverState.c2.vy);
+      }
+
+      // Record history for lag compensation
+      serverHistory.push({
+        timestamp: currentTime,
+        c1: { ...serverState.c1 },
+        c2: { ...serverState.c2 }
+      });
+      while (serverHistory.length > 0 && currentTime - serverHistory[0].timestamp > 1500) {
+        serverHistory.shift();
+      }
+
+      // Broadcast server snapshot to client
+      if (Math.random() >= dropRate) {
+        serverToClient1.push({
+          deliverAt: currentTime + latencyMs,
+          snapshot: {
+            tick: serverTick,
+            timestamp: currentTime,
+            lastProcessedSeq: serverLastProcessedC1Seq,
+            c1: { ...serverState.c1 },
+            c2: { ...serverState.c2 }
+          }
+        });
+      }
+
+      // 4. Deliver packets to Client 1
+      for (let i = serverToClient1.length - 1; i >= 0; i--) {
+        const pkt = serverToClient1[i];
+        if (currentTime >= pkt.deliverAt) {
+          serverToClient1.splice(i, 1);
+          handleClientReconciliation(pkt.snapshot);
+        }
+      }
+
+      // 5. Render Interpolated C2 on Client 1
+      let c1ViewOfC2 = { ...serverState.c2 };
+      if (interpolationEnabled && c1RemoteSnapshots.length > 0) {
+        const renderTime = currentTime - 100;
+        c1ViewOfC2 = interpolateEntity(c1RemoteSnapshots, renderTime);
+      }
+
+      // UI stats update
+      document.getElementById('c1-seq').textContent = `Seq: #${c1Seq}`;
+      document.getElementById('srv-tick').textContent = `Tick: #${serverTick}`;
+      document.getElementById('stat-buffer').textContent = c1InputBuffer.length;
+      document.getElementById('stat-recon').textContent = reconCount;
+
+      // Draw all views
+      drawClient1(c1ViewOfC2);
+      drawServer();
+      drawClient2();
+
+      requestAnimationFrame(loop);
+    }
+
+    function handleClientReconciliation(snap) {
+      c1ServerGhost = { ...snap.c1 };
+      c1RemoteSnapshots.push({ timestamp: snap.timestamp, state: { ...snap.c2 } });
+      while (c1RemoteSnapshots.length > 60) c1RemoteSnapshots.shift();
+
+      if (!predictionEnabled) {
+        c1Predicted = { ...snap.c1 };
+        return;
+      }
+
+      // Gabriel Gambetta Reconciliation loop:
+      // Discard acknowledged inputs
+      const preLen = c1InputBuffer.length;
+      const unacked = [];
+      for (const inp of c1InputBuffer) {
+        if (inp.seq > snap.lastProcessedSeq) {
+          unacked.push(inp);
+        }
+      }
+      c1InputBuffer.length = 0;
+      c1InputBuffer.push(...unacked);
+
+      // Snap to server authoritative state
+      const preRecon = { ...c1Predicted };
+      c1Predicted = { ...snap.c1 };
+
+      // Reapply unacknowledged inputs
+      for (const inp of c1InputBuffer) {
+        c1Predicted.x = Math.max(16, Math.min(arenaWidth - 16, c1Predicted.x + inp.dx));
+        c1Predicted.y = Math.max(16, Math.min(arenaHeight - 16, c1Predicted.y + inp.dy));
+      }
+
+      const divergence = Math.hypot(c1Predicted.x - preRecon.x, c1Predicted.y - preRecon.y);
+      if (divergence > 1.0) {
+        reconCount++;
+      }
+    }
+
+    function handleServerShot(pkt) {
+      // Find rewound frame in history
+      const targetTime = pkt.shotTime;
+      let rewoundC2 = { ...serverState.c2 };
+
+      for (let i = 0; i < serverHistory.length - 1; i++) {
+        const f0 = serverHistory[i];
+        const f1 = serverHistory[i + 1];
+        if (f0.timestamp <= targetTime && targetTime <= f1.timestamp) {
+          const alpha = (targetTime - f0.timestamp) / (f1.timestamp - f0.timestamp);
+          rewoundC2.x = f0.c2.x + (f1.c2.x - f0.c2.x) * alpha;
+          rewoundC2.y = f0.c2.y + (f1.c2.y - f0.c2.y) * alpha;
+          break;
+        }
+      }
+
+      // Raycast against rewound hitbox vs live hitbox
+      const rayY = pkt.origin.y;
+      const hitRadius = 18;
+      const hitCompensated = Math.abs(rewoundC2.y - rayY) <= hitRadius;
+
+      const deltaMs = performance.now() - targetTime;
+      document.getElementById('stat-rewind').textContent = `${deltaMs.toFixed(1)} ms`;
+
+      if (hitCompensated) {
+        hitsCount++;
+        document.getElementById('stat-hits').textContent = hitsCount;
+        showHitBanner(`🎯 Hit registered! Target rewound ${deltaMs.toFixed(0)}ms in past`);
+      }
+
+      activeRay = {
+        origin: pkt.origin,
+        targetX: pkt.targetX,
+        hit: hitCompensated,
+        rewoundTarget: { ...rewoundC2 },
+        expiresAt: performance.now() + 400
+      };
+    }
+
+    function showHitBanner(text) {
+      const banner = document.getElementById('hit-banner');
+      banner.textContent = text;
+      banner.style.opacity = '1';
+      setTimeout(() => { banner.style.opacity = '0'; }, 1200);
+    }
+
+    function interpolateEntity(snapshots, targetTime) {
+      if (snapshots.length === 0) return { x: 320, y: 150 };
+      if (targetTime <= snapshots[0].timestamp) return { ...snapshots[0].state };
+      if (targetTime >= snapshots[snapshots.length - 1].timestamp) return { ...snapshots[snapshots.length - 1].state };
+
+      for (let i = 0; i < snapshots.length - 1; i++) {
+        const s0 = snapshots[i];
+        const s1 = snapshots[i + 1];
+        if (s0.timestamp <= targetTime && targetTime <= s1.timestamp) {
+          const alpha = (targetTime - s0.timestamp) / (s1.timestamp - s0.timestamp);
+          return {
+            x: s0.state.x + (s1.state.x - s0.state.x) * alpha,
+            y: s0.state.y + (s1.state.y - s0.state.y) * alpha
+          };
+        }
+      }
+      return { ...snapshots[snapshots.length - 1].state };
+    }
+
+    function drawGrid(ctx) {
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(0, 0, arenaWidth, arenaHeight);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < arenaWidth; x += 30) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, arenaHeight); ctx.stroke();
+      }
+      for (let y = 0; y < arenaHeight; y += 30) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(arenaWidth, y); ctx.stroke();
+      }
+    }
+
+    function drawClient1(c2View) {
+      drawGrid(ctx1);
+
+      // Draw server ghost
+      ctx1.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+      ctx1.setLineDash([4, 4]);
+      ctx1.beginPath();
+      ctx1.arc(c1ServerGhost.x, c1ServerGhost.y, 14, 0, Math.PI * 2);
+      ctx1.stroke();
+      ctx1.setLineDash([]);
+
+      // Draw local predicted player
+      ctx1.fillStyle = '#22d3ee';
+      ctx1.shadowColor = '#06b6d4';
+      ctx1.shadowBlur = 10;
+      ctx1.beginPath();
+      ctx1.arc(c1Predicted.x, c1Predicted.y, 14, 0, Math.PI * 2);
+      ctx1.fill();
+      ctx1.shadowBlur = 0;
+
+      // Draw remote target
+      ctx1.fillStyle = '#fb7185';
+      ctx1.fillRect(c2View.x - 12, c2View.y - 12, 24, 24);
+    }
+
+    function drawServer() {
+      drawGrid(ctxSrv);
+
+      // Draw C1 server entity
+      ctxSrv.fillStyle = '#0284c7';
+      ctxSrv.beginPath();
+      ctxSrv.arc(serverState.c1.x, serverState.c1.y, 14, 0, Math.PI * 2);
+      ctxSrv.fill();
+
+      // Draw C2 live server entity
+      ctxSrv.fillStyle = '#e11d48';
+      ctxSrv.fillRect(serverState.c2.x - 12, serverState.c2.y - 12, 24, 24);
+
+      // Draw Lag comp rewind visualization if active
+      if (activeRay && performance.now() < activeRay.expiresAt) {
+        // Rewound ghost
+        ctxSrv.strokeStyle = '#f59e0b';
+        ctxSrv.lineWidth = 2;
+        ctxSrv.strokeRect(activeRay.rewoundTarget.x - 12, activeRay.rewoundTarget.y - 12, 24, 24);
+
+        // Ray
+        ctxSrv.strokeStyle = activeRay.hit ? '#34d399' : '#f43f5e';
+        ctxSrv.lineWidth = 2;
+        ctxSrv.beginPath();
+        ctxSrv.moveTo(activeRay.origin.x, activeRay.origin.y);
+        ctxSrv.lineTo(activeRay.targetX, activeRay.origin.y);
+        ctxSrv.stroke();
+      }
+    }
+
+    function drawClient2() {
+      drawGrid(ctx2);
+
+      // Draw local C2
+      ctx2.fillStyle = '#fb7185';
+      ctx2.shadowColor = '#f43f5e';
+      ctx2.shadowBlur = 10;
+      ctx2.fillRect(serverState.c2.x - 12, serverState.c2.y - 12, 24, 24);
+      ctx2.shadowBlur = 0;
+
+      // Draw interpolated C1
+      ctx2.fillStyle = '#38bdf8';
+      ctx2.beginPath();
+      ctx2.arc(serverState.c1.x, serverState.c1.y, 14, 0, Math.PI * 2);
+      ctx2.fill();
+    }
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
